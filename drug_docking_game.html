@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drug Docking Challenge — IISER Tirupati Science Day</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Nunito:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════
+   ROOT
+══════════════════════════════════════════════ */
+:root {
+  --bg:       #060d1f;
+  --surface:  #0a1628;
+  --card:     #0f1e35;
+  --border:   #1a3055;
+  --border2:  #2a4a7a;
+  --glow:     rgba(0,220,255,0.15);
+
+  --cyan:     #00dcff;
+  --green:    #00ff9d;
+  --amber:    #ffc107;
+  --red:      #ff4560;
+  --purple:   #c084fc;
+  --pink:     #f472b6;
+  --teal:     #2dd4bf;
+
+  --text:     #e8f4ff;
+  --muted:    #4a6a90;
+  --dim:      #0c1830;
+
+  --fh: 'Orbitron', monospace;
+  --fb: 'Nunito', sans-serif;
+  --fm: 'DM Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--fb);
+  position: relative;
+}
+
+/* ══════════════════════════════════════════════
+   ANIMATED BACKGROUND
+══════════════════════════════════════════════ */
+#bg-layer {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  overflow: hidden;
+}
+.bg-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(0,220,255,0.04) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,220,255,0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: gridMove 20s linear infinite;
+}
+@keyframes gridMove { from{background-position:0 0} to{background-position:50px 50px} }
+
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: orbFloat ease-in-out infinite alternate;
+}
+@keyframes orbFloat {
+  from { transform: translateY(0) scale(1); opacity: 0.6; }
+  to   { transform: translateY(-40px) scale(1.1); opacity: 0.3; }
+}
+
+.dna-helix {
+  position: absolute;
+  right: -80px; top: 50%; transform: translateY(-50%);
+  width: 160px; height: 600px;
+  opacity: 0.06;
+}
+
+/* floating molecules */
+.float-mol {
+  position: absolute;
+  opacity: 0;
+  animation: floatMol linear infinite;
+  pointer-events: none;
+}
+@keyframes floatMol {
+  0%   { opacity: 0; transform: translateY(110vh) rotate(0deg); }
+  10%  { opacity: 0.15; }
+  90%  { opacity: 0.08; }
+  100% { opacity: 0; transform: translateY(-10vh) rotate(360deg); }
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN ENGINE
+══════════════════════════════════════════════ */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(100%);
+  transition: opacity 0.5s cubic-bezier(.4,0,.2,1),
+              transform 0.5s cubic-bezier(.4,0,.2,1);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateX(0);
+}
+.screen.exit-left {
+  opacity: 0;
+  transform: translateX(-100%);
+}
+.screen.enter-right {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+/* ══════════════════════════════════════════════
+   COMMON UI
+══════════════════════════════════════════════ */
+.glass {
+  background: rgba(10,22,40,0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+}
+
+.glow-text {
+  text-shadow: 0 0 30px currentColor;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 14px 36px;
+  border-radius: 50px;
+  font-family: var(--fh);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.btn:hover::after { opacity: 1; }
+.btn:hover { transform: translateY(-3px) scale(1.02); }
+.btn:active { transform: translateY(0) scale(0.98); }
+
+.btn-cyan {
+  background: linear-gradient(135deg, #00dcff, #0088cc);
+  color: #000;
+  box-shadow: 0 0 30px rgba(0,220,255,0.4);
+}
+.btn-cyan:hover { box-shadow: 0 0 50px rgba(0,220,255,0.6); }
+
+.btn-green {
+  background: linear-gradient(135deg, #00ff9d, #00b86a);
+  color: #000;
+  box-shadow: 0 0 30px rgba(0,255,157,0.4);
+}
+.btn-green:hover { box-shadow: 0 0 50px rgba(0,255,157,0.6); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--cyan);
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 20px rgba(0,220,255,0.15);
+}
+.btn-outline:hover {
+  background: rgba(0,220,255,0.1);
+  box-shadow: 0 0 40px rgba(0,220,255,0.3);
+}
+
+.btn-amber {
+  background: linear-gradient(135deg, #ffc107, #e67e00);
+  color: #000;
+  box-shadow: 0 0 30px rgba(255,193,7,0.4);
+}
+.btn-amber:hover { box-shadow: 0 0 50px rgba(255,193,7,0.6); }
+
+.label-tag {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 50px;
+  font-family: var(--fm);
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  background: rgba(0,220,255,0.1);
+  border: 1px solid rgba(0,220,255,0.3);
+  color: var(--cyan);
+  margin-bottom: 16px;
+}
+
+/* IISER logo placeholder */
+.iiser-logo {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 20px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50px;
+}
+.iiser-logo-circle {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #003580, #0055c4);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--fh);
+  font-size: 9px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0;
+  text-align: center;
+  line-height: 1.1;
+  border: 2px solid rgba(255,255,255,0.3);
+  box-shadow: 0 0 15px rgba(0,85,196,0.5);
+}
+.iiser-logo-text { display: flex; flex-direction: column; }
+.iiser-logo-text span:first-child {
+  font-family: var(--fh);
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 1px;
+}
+.iiser-logo-text span:last-child {
+  font-family: var(--fb);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN 1 — INTRO
+══════════════════════════════════════════════ */
+#screen-intro {
+  background: radial-gradient(ellipse at 30% 40%, rgba(0,100,200,0.12) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 60%, rgba(0,255,157,0.06) 0%, transparent 60%);
+}
+.intro-top {
+  position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+}
+.intro-center {
+  text-align: center;
+  max-width: 700px;
+}
+.intro-badge {
+  font-family: var(--fm);
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; } 50% { opacity: 0.5; }
+}
+.intro-title {
+  font-family: var(--fh);
+  font-size: clamp(28px, 5vw, 58px);
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.intro-title .line1 { color: var(--cyan); display: block; text-shadow: 0 0 40px rgba(0,220,255,0.5); }
+.intro-title .line2 { color: #fff; display: block; }
+.intro-title .line3 { color: var(--green); display: block; font-size: 0.6em; text-shadow: 0 0 30px rgba(0,255,157,0.5); }
+
+.intro-sub {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 500px;
+  margin: 16px auto 36px;
+}
+
+.intro-pills {
+  display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+  margin-bottom: 40px;
+}
+.intro-pill {
+  padding: 6px 16px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid;
+}
+
+.dna-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  display: block;
+  animation: dnaRotate 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(0,220,255,0.5));
+}
+@keyframes dnaRotate {
+  0%,100% { transform: rotateY(0deg) scale(1); }
+  50%      { transform: rotateY(20deg) scale(1.05); }
+}
+
+.intro-bottom {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+  font-family: var(--fm);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN 2 — LEVEL SELECT
+══════════════════════════════════════════════ */
+.level-grid {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 720px;
+}
+.level-card {
+  width: 120px;
+  padding: 20px 12px;
+  border-radius: 16px;
+  border: 2px solid var(--border2);
+  background: var(--card);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.level-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.03));
+  pointer-events: none;
+}
+.level-card:hover {
+  transform: translateY(-6px) scale(1.05);
+  border-color: var(--cyan);
+  box-shadow: 0 12px 40px rgba(0,220,255,0.25);
+}
+.level-card.selected {
+  border-color: var(--green);
+  background: rgba(0,255,157,0.08);
+  box-shadow: 0 0 30px rgba(0,255,157,0.3);
+  transform: translateY(-4px) scale(1.03);
+}
+.level-emoji { font-size: 32px; margin-bottom: 8px; display: block; }
+.level-name  {
+  font-family: var(--fh);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.level-desc  { font-size: 10px; color: var(--muted); line-height: 1.4; }
+.level-stars { font-size: 12px; margin-top: 8px; }
+
+.level-info-box {
+  max-width: 500px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: var(--dim);
+  border: 1px solid var(--border2);
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 20px;
+  min-height: 56px;
+  transition: all 0.3s;
+}
+.level-info-box strong { color: var(--cyan); }
+
+/* ══════════════════════════════════════════════
+   SCREEN 3 — DISEASE SELECT
+══════════════════════════════════════════════ */
+.disease-grid {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 800px;
+}
+.disease-card {
+  width: 140px;
+  padding: 22px 14px;
+  border-radius: 18px;
+  border: 2px solid var(--border2);
+  background: var(--card);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(.4,0,.2,1);
+  position: relative;
+}
+.disease-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+}
+.disease-card.selected {
+  transform: translateY(-6px) scale(1.04);
+}
+.disease-emoji { font-size: 40px; margin-bottom: 10px; display: block;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  animation: bounce2 2s ease-in-out infinite;
+}
+@keyframes bounce2 {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+.disease-name {
+  font-family: var(--fh);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.disease-protein {
+  font-family: var(--fm);
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN 4 — GAME
+══════════════════════════════════════════════ */
+#screen-game {
+  padding: 16px;
+  justify-content: flex-start;
+}
+.game-hud {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: rgba(10,22,40,0.9);
+  border: 1px solid var(--border2);
+  border-radius: 50px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hud-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2px;
+}
+.hud-label {
+  font-family: var(--fm);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hud-value {
+  font-family: var(--fh);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.game-content {
+  width: 100%;
+  max-width: 900px;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+  flex: 1;
+  align-items: start;
+}
+@media(max-width:680px) { .game-content { grid-template-columns: 1fr; } }
+
+.pocket-panel {
+  background: rgba(10,22,40,0.9);
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.pocket-title {
+  font-family: var(--fh);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  text-align: center;
+}
+.pocket-svg-wrap {
+  position: relative;
+  width: 200px; height: 190px;
+}
+.pocket-hint {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.ligands-panel {
+  background: rgba(10,22,40,0.9);
+  border: 1px solid var(--border2);
+  border-radius: 18px;
+  padding: 20px;
+}
+.ligands-title {
+  font-family: var(--fh);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--amber);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.ligand-grid-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ligand-card-game {
+  background: var(--card);
+  border: 2px solid var(--border2);
+  border-radius: 14px;
+  padding: 12px 8px 8px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  position: relative;
+  min-height: 120px;
+  user-select: none;
+}
+.ligand-card-game:hover:not(.locked) {
+  border-color: var(--cyan);
+  background: rgba(0,220,255,0.05);
+  transform: scale(1.03);
+  box-shadow: 0 0 20px rgba(0,220,255,0.2);
+}
+.ligand-card-game.chosen {
+  border-color: var(--amber);
+  background: rgba(255,193,7,0.08);
+  box-shadow: 0 0 25px rgba(255,193,7,0.3);
+  transform: scale(1.03);
+}
+.ligand-card-game.locked { cursor: default; }
+.ligand-card-game.correct-reveal {
+  border-color: var(--green);
+  background: rgba(0,255,157,0.1);
+  box-shadow: 0 0 30px rgba(0,255,157,0.4);
+}
+.ligand-card-game.wrong-reveal {
+  border-color: var(--red);
+  background: rgba(255,69,96,0.06);
+  opacity: 0.6;
+}
+.ligand-card-game.chosen-wrong-reveal {
+  border-color: var(--red);
+  background: rgba(255,69,96,0.1);
+  opacity: 1;
+}
+.lig-letter {
+  position: absolute; top: 6px; left: 9px;
+  font-family: var(--fh);
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--muted);
+}
+.lig-reveal-badge {
+  position: absolute; top: 4px; right: 6px;
+  font-size: 16px;
+  display: none;
+}
+.locked .lig-reveal-badge { display: block; }
+
+.lig-name {
+  font-size: 9px;
+  font-family: var(--fm);
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.game-footer {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.selection-msg {
+  font-family: var(--fm);
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+}
+
+/* ══════════════════════════════════════════════
+   SCREEN 5 — RESULT
+══════════════════════════════════════════════ */
+#screen-result { gap: 16px; }
+
+.result-hero {
+  text-align: center;
+  padding: 24px 32px;
+  border-radius: 20px;
+  max-width: 700px;
+  width: 100%;
+}
+.result-big-icon { font-size: 72px; margin-bottom: 8px; display: block; animation: popIn 0.4s cubic-bezier(.17,.67,.83,.67); }
+@keyframes popIn { from{transform:scale(0.3);opacity:0} to{transform:scale(1);opacity:1} }
+.result-title {
+  font-family: var(--fh);
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.result-subtitle { font-size: 14px; color: var(--muted); }
+
+.stars-row {
+  display: flex; justify-content: center; gap: 6px;
+  margin: 12px 0;
+}
+.star-item {
+  font-size: 28px;
+  animation: starPop 0.3s ease backwards;
+  filter: drop-shadow(0 0 8px rgba(255,193,7,0.5));
+}
+@keyframes starPop { from{transform:scale(0) rotate(-20deg)} to{transform:scale(1) rotate(0)} }
+
+.result-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 700px;
+  width: 100%;
+}
+@media(max-width:600px) { .result-two-col { grid-template-columns: 1fr; } }
+
+.result-panel-card {
+  background: rgba(10,22,40,0.9);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 20px;
+}
+.rpanel-title {
+  font-family: var(--fh);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* docking animation */
+.dock-anim-svg {
+  width: 100%;
+  height: 160px;
+}
+.dock-molecule {
+  animation: dockIn 2s cubic-bezier(.25,.46,.45,.94) forwards;
+  transform-origin: center;
+}
+@keyframes dockIn {
+  0%   { transform: translate(80px, -40px) scale(0.4) rotate(45deg); opacity: 0; }
+  40%  { opacity: 1; }
+  70%  { transform: translate(0, 0) scale(1.1) rotate(-5deg); }
+  85%  { transform: translate(0, 0) scale(0.95) rotate(2deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+}
+.energy-pulse {
+  animation: energyPulse 1s ease 2s infinite;
+}
+@keyframes energyPulse {
+  0%,100% { opacity: 0.6; r: 4; }
+  50%      { opacity: 1; r: 7; }
+}
+
+.score-mini-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.score-mini-table th {
+  font-family: var(--fm);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.score-mini-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(26,48,85,0.5);
+  font-size: 11px;
+}
+.score-mini-table tr:last-child td { border-bottom: none; }
+.score-mini-table tr.best-row td { background: rgba(0,255,157,0.05); }
+.e-good  { color: var(--green); font-family: var(--fm); font-weight: 700; }
+.e-ok    { color: var(--cyan);  font-family: var(--fm); }
+.e-low   { color: var(--amber); font-family: var(--fm); }
+.e-bad   { color: var(--red);   font-family: var(--fm); }
+.e-stars { color: var(--amber); }
+
+/* ══════════════════════════════════════════════
+   SCREEN 6 — LEADERBOARD
+══════════════════════════════════════════════ */
+#screen-leaderboard { gap: 16px; }
+
+.lb-header {
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+}
+.lb-title {
+  font-family: var(--fh);
+  font-size: clamp(22px, 4vw, 36px);
+  font-weight: 900;
+  color: var(--amber);
+  text-shadow: 0 0 30px rgba(255,193,7,0.4);
+  margin-bottom: 4px;
+}
+.lb-subtitle { font-size: 13px; color: var(--muted); }
+.lb-current-player {
+  padding: 14px 24px;
+  border-radius: 50px;
+  background: rgba(0,255,157,0.1);
+  border: 1px solid rgba(0,255,157,0.3);
+  font-family: var(--fh);
+  font-size: 14px;
+  color: var(--green);
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 15px rgba(0,255,157,0.2); }
+  50%      { box-shadow: 0 0 35px rgba(0,255,157,0.5); }
+}
+
+.lb-table-wrap {
+  width: 100%;
+  max-width: 580px;
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 16px;
+  border: 1px solid var(--border2);
+  background: rgba(10,22,40,0.9);
+}
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th {
+  font-family: var(--fm);
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border2);
+  text-align: left;
+  position: sticky; top: 0;
+  background: rgba(10,22,40,0.98);
+}
+.lb-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(26,48,85,0.4);
+  font-size: 14px;
+}
+.lb-table tr:last-child td { border-bottom: none; }
+.lb-table tr.lb-me td { background: rgba(0,255,157,0.07); }
+
+.lb-rank {
+  font-family: var(--fh);
+  font-size: 16px;
+  font-weight: 900;
+  width: 50px;
+}
+.rank-1 { color: #ffd700; text-shadow: 0 0 15px rgba(255,215,0,0.5); }
+.rank-2 { color: #c0c0c0; text-shadow: 0 0 15px rgba(192,192,192,0.4); }
+.rank-3 { color: #cd7f32; text-shadow: 0 0 15px rgba(205,127,50,0.4); }
+.rank-other { color: var(--muted); }
+
+.lb-name { font-weight: 700; font-size: 14px; }
+.lb-disease { font-size: 11px; color: var(--muted); font-family: var(--fm); }
+.lb-stars-cell { font-size: 14px; }
+.lb-score-cell { font-family: var(--fh); font-size: 13px; color: var(--cyan); }
+
+.lb-trophy { font-size: 28px; margin-right: 6px; }
+
+.next-player-btn-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.player-count-display {
+  font-family: var(--fm);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+.player-count-display span {
+  color: var(--cyan);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════
+   MOLECULE SVG SHAPES
+══════════════════════════════════════════════ */
+.mol-svg { width: 82px; height: 72px; overflow: visible; }
+
+/* ══════════════════════════════════════════════
+   TRANSITIONS & ANIMATIONS
+══════════════════════════════════════════════ */
+.fade-in-up {
+  animation: fadeInUp 0.5s ease backwards;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+[data-delay="1"] { animation-delay: 0.1s; }
+[data-delay="2"] { animation-delay: 0.2s; }
+[data-delay="3"] { animation-delay: 0.3s; }
+[data-delay="4"] { animation-delay: 0.4s; }
+[data-delay="5"] { animation-delay: 0.5s; }
+[data-delay="6"] { animation-delay: 0.6s; }
+
+/* ══════════════════════════════════════════════
+   CONFETTI
+══════════════════════════════════════════════ */
+.confetti-piece {
+  position: fixed;
+  width: 10px; height: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── BACKGROUND ── -->
+<div id="bg-layer">
+  <div class="bg-grid"></div>
+  <div class="bg-orb" style="width:400px;height:400px;left:-100px;top:-100px;background:radial-gradient(circle,rgba(0,100,200,0.15),transparent);animation-duration:8s;"></div>
+  <div class="bg-orb" style="width:350px;height:350px;right:-80px;bottom:100px;background:radial-gradient(circle,rgba(0,180,100,0.1),transparent);animation-duration:11s;animation-delay:3s;"></div>
+  <div class="bg-orb" style="width:250px;height:250px;left:40%;top:60%;background:radial-gradient(circle,rgba(200,100,255,0.08),transparent);animation-duration:9s;animation-delay:1s;"></div>
+  <svg class="dna-helix" viewBox="0 0 160 600">
+    <path d="M80,0 Q140,50 80,100 Q20,150 80,200 Q140,250 80,300 Q20,350 80,400 Q140,450 80,500 Q20,550 80,600" fill="none" stroke="rgba(0,220,255,1)" stroke-width="3"/>
+    <path d="M80,0 Q20,50 80,100 Q140,150 80,200 Q20,250 80,300 Q140,350 80,400 Q20,450 80,500 Q140,550 80,600" fill="none" stroke="rgba(0,255,157,1)" stroke-width="3"/>
+    <circle cx="80" cy="0"   r="5" fill="rgba(0,220,255,1)"/><circle cx="80" cy="50"  r="4" fill="rgba(0,255,157,1)"/>
+    <circle cx="80" cy="100" r="5" fill="rgba(0,220,255,1)"/><circle cx="80" cy="150" r="4" fill="rgba(0,255,157,1)"/>
+    <circle cx="80" cy="200" r="5" fill="rgba(0,220,255,1)"/><circle cx="80" cy="250" r="4" fill="rgba(0,255,157,1)"/>
+    <circle cx="80" cy="300" r="5" fill="rgba(0,220,255,1)"/><circle cx="80" cy="350" r="4" fill="rgba(0,255,157,1)"/>
+    <circle cx="80" cy="400" r="5" fill="rgba(0,220,255,1)"/><circle cx="80" cy="450" r="4" fill="rgba(0,255,157,1)"/>
+    <circle cx="80" cy="500" r="5" fill="rgba(0,220,255,1)"/><circle cx="80" cy="550" r="4" fill="rgba(0,255,157,1)"/>
+  </svg>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 1 — INTRO
+════════════════════════════════════════════ -->
+<div class="screen active" id="screen-intro">
+  <div class="intro-top">
+    <div class="iiser-logo">
+      <div class="iiser-logo-circle">IISER<br>TPT</div>
+      <div class="iiser-logo-text">
+        <span>IISER Tirupati</span>
+        <span>Science Day 2026</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="intro-center">
+    <span class="dna-icon">🧬</span>
+
+    <div class="intro-badge fade-in-up" data-delay="1">🔬 Interactive Science Activity</div>
+
+    <h1 class="intro-title fade-in-up" data-delay="2">
+      <span class="line1">DRUG DOCKING</span>
+      <span class="line2">CHALLENGE</span>
+      <span class="line3">Find the Right Drug. Save the World.</span>
+    </h1>
+
+    <p class="intro-sub fade-in-up" data-delay="3">
+      In real pharmaceutical research, computers test thousands of drug molecules to find the perfect fit for a disease protein. Can <em>you</em> think like a scientist and pick the right molecule?
+    </p>
+
+    <div class="intro-pills fade-in-up" data-delay="4">
+      <div class="intro-pill" style="border-color:var(--cyan);color:var(--cyan);background:rgba(0,220,255,0.08)">🦠 COVID-19</div>
+      <div class="intro-pill" style="border-color:var(--amber);color:var(--amber);background:rgba(255,193,7,0.08)">🩸 Diabetes</div>
+      <div class="intro-pill" style="border-color:var(--green);color:var(--green);background:rgba(0,255,157,0.08)">🫁 Tuberculosis</div>
+      <div class="intro-pill" style="border-color:var(--red);color:var(--red);background:rgba(255,69,96,0.08)">🔴 Cancer</div>
+      <div class="intro-pill" style="border-color:var(--purple);color:var(--purple);background:rgba(192,132,252,0.08)">🦟 Malaria</div>
+    </div>
+
+    <button class="btn btn-cyan fade-in-up" data-delay="5" style="font-size:16px;padding:18px 52px;" onclick="goTo('screen-level')">
+      ▶ START GAME
+    </button>
+  </div>
+
+  <div class="intro-bottom fade-in-up" data-delay="6">
+    Dept. of Biological Sciences &nbsp;·&nbsp; IISER Tirupati &nbsp;·&nbsp; Science Day 2026
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 2 — LEVEL SELECT
+════════════════════════════════════════════ -->
+<div class="screen" id="screen-level">
+  <div class="label-tag">Step 1 of 2</div>
+  <h2 style="font-family:var(--fh);font-size:clamp(20px,3.5vw,34px);font-weight:900;margin-bottom:6px;text-align:center;" class="fade-in-up">Choose Your Level</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:28px;text-align:center;" class="fade-in-up" data-delay="1">How good are you at reading molecular structures?</p>
+
+  <div class="level-grid fade-in-up" data-delay="2">
+    <div class="level-card" onclick="selectLevel(1,this)">
+      <span class="level-emoji">🌱</span>
+      <div class="level-name">Level 1</div>
+      <div class="level-stars">⭐</div>
+      <div class="level-desc">Easy — very different shapes</div>
+    </div>
+    <div class="level-card" onclick="selectLevel(2,this)">
+      <span class="level-emoji">🌿</span>
+      <div class="level-name">Level 2</div>
+      <div class="level-stars">⭐⭐</div>
+      <div class="level-desc">Easy-ish — some similarity</div>
+    </div>
+    <div class="level-card" onclick="selectLevel(3,this)">
+      <span class="level-emoji">🧪</span>
+      <div class="level-name">Level 3</div>
+      <div class="level-stars">⭐⭐⭐</div>
+      <div class="level-desc">Medium — same drug family</div>
+    </div>
+    <div class="level-card" onclick="selectLevel(4,this)">
+      <span class="level-emoji">🔬</span>
+      <div class="level-name">Level 4</div>
+      <div class="level-stars">⭐⭐⭐⭐</div>
+      <div class="level-desc">Hard — closely related drugs</div>
+    </div>
+    <div class="level-card" onclick="selectLevel(5,this)">
+      <span class="level-emoji">🧬</span>
+      <div class="level-name">Level 5</div>
+      <div class="level-stars">⭐⭐⭐⭐⭐</div>
+      <div class="level-desc">Expert — near-identical analogs</div>
+    </div>
+  </div>
+
+  <div class="level-info-box fade-in-up" data-delay="3" id="level-info-box">
+    Select a level to see what to expect →
+  </div>
+
+  <div style="margin-top:24px;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;" class="fade-in-up" data-delay="4">
+    <button class="btn btn-outline" onclick="goTo('screen-intro')">← Back</button>
+    <button class="btn btn-cyan" id="btn-level-next" onclick="goTo('screen-disease')" disabled style="opacity:0.4;cursor:not-allowed">Next: Pick Disease →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 3 — DISEASE SELECT
+════════════════════════════════════════════ -->
+<div class="screen" id="screen-disease">
+  <div class="label-tag">Step 2 of 2</div>
+  <h2 style="font-family:var(--fh);font-size:clamp(20px,3.5vw,34px);font-weight:900;margin-bottom:6px;text-align:center;" class="fade-in-up">Choose Your Target</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:28px;text-align:center;" class="fade-in-up" data-delay="1">Which disease protein will you try to block?</p>
+
+  <div class="disease-grid fade-in-up" data-delay="2">
+    <div class="disease-card" onclick="selectDisease('covid',this)" style="--dc:var(--cyan)">
+      <span class="disease-emoji">🦠</span>
+      <div class="disease-name" style="color:var(--cyan)">COVID-19</div>
+      <div class="disease-protein">SARS-CoV-2<br>Main Protease<br>Mᵖʳᵒ / 7VH8</div>
+    </div>
+    <div class="disease-card" onclick="selectDisease('diabetes',this)">
+      <span class="disease-emoji">🩸</span>
+      <div class="disease-name" style="color:var(--amber)">Diabetes</div>
+      <div class="disease-protein">DPP-4 Enzyme<br>2I78<br>Type 2 DM</div>
+    </div>
+    <div class="disease-card" onclick="selectDisease('tb',this)">
+      <span class="disease-emoji">🫁</span>
+      <div class="disease-name" style="color:var(--green)">Tuberculosis</div>
+      <div class="disease-protein">InhA Reductase<br>1ENY<br>M. tuberculosis</div>
+    </div>
+    <div class="disease-card" onclick="selectDisease('cancer',this)">
+      <span class="disease-emoji">🔴</span>
+      <div class="disease-name" style="color:var(--red)">Cancer</div>
+      <div class="disease-protein">BCR-ABL Kinase<br>2HYY<br>CML</div>
+    </div>
+    <div class="disease-card" onclick="selectDisease('malaria',this)">
+      <span class="disease-emoji">🦟</span>
+      <div class="disease-name" style="color:var(--purple)">Malaria</div>
+      <div class="disease-protein">PfDHFR<br>3QGT<br>P. falciparum</div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;" class="fade-in-up" data-delay="3">
+    <button class="btn btn-outline" onclick="goTo('screen-level')">← Back</button>
+    <button class="btn btn-green" id="btn-start-game" onclick="startGame()" disabled style="opacity:0.4;cursor:not-allowed">⚡ Start Docking!</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 4 — GAME
+════════════════════════════════════════════ -->
+<div class="screen" id="screen-game">
+  <div class="game-hud" id="game-hud">
+    <div class="hud-item">
+      <span class="hud-label">Player</span>
+      <span class="hud-value" id="hud-player">—</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Disease</span>
+      <span class="hud-value" id="hud-disease">—</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Level</span>
+      <span class="hud-value" id="hud-level">—</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Target</span>
+      <span class="hud-value" id="hud-target">—</span>
+    </div>
+  </div>
+
+  <div class="game-content">
+    <!-- Pocket panel -->
+    <div class="pocket-panel">
+      <div class="pocket-title" id="game-pocket-title">Binding Pocket</div>
+      <div class="pocket-svg-wrap">
+        <svg id="game-pocket-svg" width="200" height="190" viewBox="0 0 200 190"></svg>
+      </div>
+      <div class="pocket-hint" id="game-pocket-hint"></div>
+    </div>
+
+    <!-- Ligands panel -->
+    <div class="ligands-panel">
+      <div class="ligands-title">👇 Pick the best-fitting drug molecule</div>
+      <div class="ligand-grid-4" id="ligand-grid"></div>
+    </div>
+  </div>
+
+  <div class="game-footer">
+    <div class="selection-msg" id="selection-msg">Click a molecule to select it</div>
+    <button class="btn btn-amber" id="submit-btn" onclick="submitAnswer()" disabled style="opacity:0.4;cursor:not-allowed">Submit Answer ✓</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 5 — RESULT
+════════════════════════════════════════════ -->
+<div class="screen" id="screen-result">
+  <div class="result-hero glass fade-in-up">
+    <span class="result-big-icon" id="result-icon">🎯</span>
+    <div class="result-title" id="result-title">—</div>
+    <div class="result-subtitle" id="result-subtitle">—</div>
+    <div class="stars-row" id="stars-row"></div>
+  </div>
+
+  <div class="result-two-col fade-in-up" data-delay="2">
+    <div class="result-panel-card">
+      <div class="rpanel-title">⚡ Docking Simulation</div>
+      <svg class="dock-anim-svg" id="dock-anim-svg" viewBox="0 0 280 160"></svg>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5;" id="dock-explanation"></div>
+    </div>
+    <div class="result-panel-card">
+      <div class="rpanel-title">📊 Binding Scores</div>
+      <table class="score-mini-table" id="score-mini-table">
+        <thead><tr><th>Drug</th><th>Energy</th><th>Fit</th></tr></thead>
+        <tbody id="score-mini-tbody"></tbody>
+      </table>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--dim);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.6;" id="binding-note"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;" class="fade-in-up" data-delay="3">
+    <button class="btn btn-amber" onclick="goToLeaderboard()">🏆 See Leaderboard</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 6 — LEADERBOARD
+════════════════════════════════════════════ -->
+<div class="screen" id="screen-leaderboard">
+  <div class="lb-header fade-in-up">
+    <div class="lb-title">🏆 LEADERBOARD</div>
+    <div class="lb-subtitle">Science Day 2026 — IISER Tirupati</div>
+  </div>
+
+  <div class="lb-current-player fade-in-up" data-delay="1" id="lb-current-banner">
+    — 
+  </div>
+
+  <div class="lb-table-wrap fade-in-up" data-delay="2">
+    <table class="lb-table">
+      <thead>
+        <tr>
+          <th style="width:50px">Rank</th>
+          <th>Player</th>
+          <th>Disease</th>
+          <th>Stars</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="lb-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="player-count-display fade-in-up" data-delay="3">
+    Total Players Today: <span id="total-players-count">0</span>
+  </div>
+
+  <div class="next-player-btn-wrap fade-in-up" data-delay="4">
+    <button class="btn btn-green" style="font-size:15px;padding:16px 48px;" onclick="nextPlayer()">
+      👤 Next Player →
+    </button>
+    <div style="font-size:11px;color:var(--muted);font-family:var(--fm);">Pass the device to the next visitor</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════════════
+   STATE
+══════════════════════════════════ */
+let currentScreen  = 'screen-intro';
+let selectedLevel  = null;
+let selectedDisease = null;
+let selectedLigand  = null;
+let playerCount    = 0;
+let leaderboard    = [];
+let answerSubmitted = false;
+
+const LEVEL_DESCS = {
+  1: '<strong>Level 1 — Rookie:</strong> Options include molecules from completely different drug classes. You just need to pick the largest, most complex one that matches the pocket size.',
+  2: '<strong>Level 2 — Learner:</strong> Two options are from the same disease area, two are from unrelated fields. Size and ring count will guide you.',
+  3: '<strong>Level 3 — Student:</strong> All four molecules target similar enzymes. You need to notice which functional groups and ring systems match this specific protein.',
+  4: '<strong>Level 4 — Researcher:</strong> All options are from the same drug class. Look for sub-pocket matching — which side chains reach into the specific notches of this pocket?',
+  5: '<strong>Level 5 — Scientist:</strong> All four are structural analogs of the correct drug — nearly identical scaffolds with tiny differences (one fluorine, one extra ring). Only the binding energy separates them!'
+};
+
+/* ══════════════════════════════════
+   DISEASE DATA
+══════════════════════════════════ */
+const DISEASES = {
+  covid: {
+    label: 'COVID-19', emoji: '🦠', color: '#00dcff',
+    pocket: 'SARS-CoV-2 Mᵖʳᵒ (PDB: 7VH8)',
+    hint: 'Deep, irregular cavity with S1 and S2 sub-pockets. Catalytic Cys145 at base.',
+    correctDrug: 'Nirmatrelvir',
+    correctEnergy: '-9.2',
+    dockExplanation: 'Nirmatrelvir enters the Mpro active site and forms a covalent bond with Cys145. Its trifluoromethyl group fills the S1 sub-pocket while the lactam ring anchors in S2.',
+    ligandsByLevel: {
+      1: [
+        { name:'Nirmatrelvir', label:'A', energy:'-9.2', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'complex_big',  correct:true,  note:'Multi-ring protease inhibitor — perfect Mpro fit' },
+        { name:'Aspirin',      label:'B', energy:'+1.2', eClass:'e-bad',  stars:'❌',        shape:'flat_tiny',   correct:false, note:'Anti-inflammatory — far too small' },
+        { name:'Metformin',    label:'C', energy:'-2.1', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'Tiny biguanide — no protease chemistry' },
+        { name:'Caffeine',     label:'D', energy:'-3.0', eClass:'e-low',  stars:'⭐⭐',       shape:'xanthine',    correct:false, note:'Purine stimulant — wrong shape entirely' }
+      ],
+      2: [
+        { name:'Nirmatrelvir', label:'A', energy:'-9.2', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'complex_big',  correct:true,  note:'Perfect covalent inhibitor for Mpro' },
+        { name:'Ritonavir',    label:'B', energy:'-7.8', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'twin_big',     correct:false, note:'HIV protease inhibitor — some overlap but not Mpro-specific' },
+        { name:'Isoniazid',    label:'C', energy:'-4.5', eClass:'e-low',  stars:'⭐⭐',       shape:'simple_py',   correct:false, note:'TB drug — too small for deep COVID pocket' },
+        { name:'Metformin',    label:'D', energy:'-2.1', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'Diabetes drug — no antiviral chemistry' }
+      ],
+      3: [
+        { name:'Nirmatrelvir', label:'A', energy:'-9.2', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'complex_big',  correct:true,  note:'Designed for Mpro via computational docking' },
+        { name:'Ritonavir',    label:'B', energy:'-7.8', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'twin_big',     correct:false, note:'Similar size but HIV-shaped binding geometry' },
+        { name:'Lopinavir',    label:'C', energy:'-7.1', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'twin_mid',     correct:false, note:'HIV protease — partial Mpro fit at higher energy' },
+        { name:'Boceprevir',   label:'D', energy:'-8.5', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'complex_mid',  correct:false, note:'HCV protease inhibitor — close but lacks trifluoromethyl group' }
+      ],
+      4: [
+        { name:'Nirmatrelvir',  label:'A', energy:'-9.2', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'complex_big',   correct:true,  note:'Pyrrolidinyl lactam — optimal S1/S2 fill' },
+        { name:'Boceprevir',    label:'B', energy:'-8.5', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'complex_mid',   correct:false, note:'Similar ketoamide warhead but lacks CF₃' },
+        { name:'Telaprevir',    label:'C', energy:'-7.9', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'complex_long',  correct:false, note:'Longer chain — overhangs S4 pocket' },
+        { name:'Narlaprevir',   label:'D', energy:'-8.1', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'complex_sq',    correct:false, note:'Sulfonamide-ketoamide — similar scaffold, different S1 contact' }
+      ],
+      5: [
+        { name:'Nirmatrelvir',  label:'A', energy:'-9.2', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'analog_a', correct:true,  note:'Has CF₃ group — fills S1 sub-pocket perfectly' },
+        { name:'PF-07304814',   label:'B', energy:'-8.8', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'analog_b', correct:false, note:'Phosphate prodrug analog — slight steric clash at S2' },
+        { name:'Ensitrelvir',   label:'C', energy:'-8.6', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'analog_c', correct:false, note:'Triazine scaffold — different hinge contact geometry' },
+        { name:'GC376',         label:'D', energy:'-8.4', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'analog_d', correct:false, note:'Bisulfite adduct — reactive warhead but lower S1 selectivity' }
+      ]
+    }
+  },
+  diabetes: {
+    label: 'Diabetes', emoji: '🩸', color: '#ffc107',
+    pocket: 'DPP-4 Active Tunnel (PDB: 2I78)',
+    hint: 'Wide tunnel with S1 and S2\' sub-pockets. Catalytic Ser630 triad.',
+    correctDrug: 'Sitagliptin',
+    correctEnergy: '-8.7',
+    dockExplanation: 'Sitagliptin slots into DPP-4\'s S1 pocket via its fluorobenzene group while the triazole-piperazine tail occupies S2\'. The protonated amine forms a salt bridge with Glu205/Glu206.',
+    ligandsByLevel: {
+      1: [
+        { name:'Sitagliptin', label:'A', energy:'-8.7', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'triple_big',  correct:true,  note:'3-ring DPP-4 inhibitor — fills both sub-pockets' },
+        { name:'Aspirin',     label:'B', energy:'+0.8', eClass:'e-bad',  stars:'❌',        shape:'flat_tiny',   correct:false, note:'Anti-inflammatory — completely wrong enzyme' },
+        { name:'Metformin',   label:'C', energy:'-1.8', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'Works via AMPK — different mechanism, no DPP-4 binding' },
+        { name:'Caffeine',    label:'D', energy:'-2.5', eClass:'e-low',  stars:'⭐',        shape:'xanthine',    correct:false, note:'Wrong shape and chemical class entirely' }
+      ],
+      2: [
+        { name:'Sitagliptin',   label:'A', energy:'-8.7', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'triple_big',  correct:true,  note:'Designed computationally for DPP-4 S1/S2\'' },
+        { name:'Vildagliptin',  label:'B', energy:'-7.4', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'twin_big',    correct:false, note:'Also a gliptin — covalent mechanism, fits differently' },
+        { name:'Metformin',     label:'C', energy:'-1.8', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'Different diabetes mechanism — minimal DPP-4 affinity' },
+        { name:'Isoniazid',     label:'D', energy:'-2.9', eClass:'e-low',  stars:'⭐',        shape:'simple_py',   correct:false, note:'TB antibacterial — wrong target class' }
+      ],
+      3: [
+        { name:'Sitagliptin',  label:'A', energy:'-8.7', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'triple_big',  correct:true,  note:'Gold standard DPP-4 inhibitor — S1/S2\' occupancy' },
+        { name:'Vildagliptin', label:'B', energy:'-7.4', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'twin_big',    correct:false, note:'Covalent gliptin — good fit but different binding mode' },
+        { name:'Saxagliptin',  label:'C', energy:'-7.1', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'cyclo_mid',   correct:false, note:'Cyclopentyl gliptin — fits S1 but not S2\'' },
+        { name:'Alogliptin',   label:'D', energy:'-7.8', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'uracil_mid',  correct:false, note:'Pyrimidinedione scaffold — slightly weaker S1 contact' }
+      ],
+      4: [
+        { name:'Sitagliptin',  label:'A', energy:'-8.7', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'triple_big',  correct:true,  note:'CF₃-benzyl + triazole + piperazine — all three fill perfectly' },
+        { name:'Trelagliptin', label:'B', energy:'-8.2', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'triple_long', correct:false, note:'Weekly gliptin — longer chain causes steric clash in S2\'' },
+        { name:'Omarigliptin', label:'C', energy:'-7.9', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'triple_sq',   correct:false, note:'Different S1 fluorine pattern — less complementarity' },
+        { name:'Denagliptin',  label:'D', energy:'-8.0', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'triple_mid',  correct:false, note:'Similar scaffold — one fewer ring in S2\' region' }
+      ],
+      5: [
+        { name:'Sitagliptin',   label:'A', energy:'-8.7', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'sita_analog_a', correct:true,  note:'2,4,5-trifluorobenzyl — exact S1 fit via steric and electronic match' },
+        { name:'Des-F-sita',    label:'B', energy:'-8.1', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'sita_analog_b', correct:false, note:'Missing one fluorine — reduced hydrophobic contact in S1' },
+        { name:'Sita-OMe',      label:'C', energy:'-7.8', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'sita_analog_c', correct:false, note:'Methoxy instead of CF₃ — too bulky for S1 pocket geometry' },
+        { name:'Nor-sita',      label:'D', energy:'-7.6', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'sita_analog_d', correct:false, note:'Truncated piperazine — doesn\'t reach full S2\' depth' }
+      ]
+    }
+  },
+  tb: {
+    label: 'Tuberculosis', emoji: '🫁', color: '#00ff9d',
+    pocket: 'M.tb InhA Reductase (PDB: 1ENY)',
+    hint: 'Elongated NAD+ groove with hydrophobic substrate channel. Tyr158 gating residue.',
+    correctDrug: 'Isoniazid-NAD adduct',
+    correctEnergy: '-9.5',
+    dockExplanation: 'Isoniazid is activated by KatG enzyme → reacts with NAD+ inside InhA\'s groove → the INH-NAD covalent adduct fills the entire substrate channel permanently.',
+    ligandsByLevel: {
+      1: [
+        { name:'Isoniazid',   label:'A', energy:'-9.5', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated',   correct:true,  note:'Suicide inhibitor — bonds to NAD+ in the groove' },
+        { name:'Aspirin',     label:'B', energy:'+0.5', eClass:'e-bad',  stars:'❌',        shape:'flat_tiny',   correct:false, note:'Wrong enzyme, wrong mechanism, wrong size' },
+        { name:'Metformin',   label:'C', energy:'-1.5', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'Diabetes drug — no antibacterial chemistry' },
+        { name:'Caffeine',    label:'D', energy:'-2.0', eClass:'e-low',  stars:'⭐',        shape:'xanthine',    correct:false, note:'Purine — no InhA selectivity' }
+      ],
+      2: [
+        { name:'Isoniazid',    label:'A', energy:'-9.5', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated',    correct:true,  note:'Activated to covalent NAD adduct — fills groove permanently' },
+        { name:'Ethionamide',  label:'B', energy:'-7.1', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'thioamide',    correct:false, note:'Also InhA inhibitor but weaker — less efficient activation' },
+        { name:'Sitagliptin',  label:'C', energy:'-4.1', eClass:'e-low',  stars:'⭐⭐',       shape:'triple_big',  correct:false, note:'Diabetes drug — no InhA chemistry' },
+        { name:'Nirmatrelvir', label:'D', energy:'-3.2', eClass:'e-low',  stars:'⭐⭐',       shape:'complex_big', correct:false, note:'Antiviral — completely different target class' }
+      ],
+      3: [
+        { name:'Isoniazid',   label:'A', energy:'-9.5', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated',   correct:true,  note:'Best InhA inhibitor — suicide mechanism via NAD adduct' },
+        { name:'Ethionamide', label:'B', energy:'-7.1', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'thioamide',   correct:false, note:'Prodrug backup — same target, less potent' },
+        { name:'Triclosan',   label:'C', energy:'-6.5', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'triclosan',   correct:false, note:'Enoyl reductase inhibitor — same enzyme family, lower selectivity' },
+        { name:'Diazaborine', label:'D', energy:'-5.8', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'boronate',    correct:false, note:'InhA direct inhibitor — does not use NAD adduct mechanism' }
+      ],
+      4: [
+        { name:'Isoniazid',      label:'A', energy:'-9.5', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated',    correct:true,  note:'Pyridine + hydrazide — precise NAD bonding geometry' },
+        { name:'Ethionamide',    label:'B', energy:'-7.1', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'thioamide',    correct:false, note:'Pyridine + thioamide — similar but weaker KatG activation' },
+        { name:'Prothionamide',  label:'C', energy:'-6.8', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'pro_thio',     correct:false, note:'Propyl-ethionamide — extra carbon reduces groove fit depth' },
+        { name:'Methyl-INH',     label:'D', energy:'-8.1', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'methyl_inh',   correct:false, note:'N-methyl isoniazid — close analog, reduced hydrazide reactivity' }
+      ],
+      5: [
+        { name:'Isoniazid',     label:'A', energy:'-9.5', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'inh_analog_a', correct:true,  note:'Pyridine + free hydrazide — optimal KatG activation and NAD adduct fit' },
+        { name:'4-F-INH',       label:'B', energy:'-8.9', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'inh_analog_b', correct:false, note:'4-fluoro analog — slightly altered electronic activation profile' },
+        { name:'3-Cl-INH',      label:'C', energy:'-8.4', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'inh_analog_c', correct:false, note:'3-chloro analog — steric clash near Tyr158 in the groove' },
+        { name:'N-Methyl-INH',  label:'D', energy:'-8.0', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'inh_analog_d', correct:false, note:'N-methylated — blocks hydrazide → imine conversion, loses activity' }
+      ]
+    }
+  },
+  cancer: {
+    label: 'Cancer (CML)', emoji: '🔴', color: '#ff4560',
+    pocket: 'BCR-ABL Tyrosine Kinase (PDB: 2HYY)',
+    hint: 'Bilobal ATP-binding cleft. Drug must span hinge region. Thr315 gatekeeper residue.',
+    correctDrug: 'Imatinib',
+    correctEnergy: '-10.1',
+    dockExplanation: 'Imatinib spans the BCR-ABL ATP cleft from the N-lobe across the hinge to the C-lobe. Its methylpiperazine tail reaches the hydrophilic back pocket while the pyrimidine makes hinge H-bonds.',
+    ligandsByLevel: {
+      1: [
+        { name:'Imatinib', label:'A', energy:'-10.1', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated_big', correct:true,  note:'Spans the full ATP-binding cleft — first targeted cancer drug' },
+        { name:'Aspirin',  label:'B', energy:'+1.5',  eClass:'e-bad',  stars:'❌',        shape:'flat_tiny',    correct:false, note:'COX inhibitor — tiny molecule, no kinase chemistry' },
+        { name:'Metformin',label:'C', energy:'-1.8',  eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',   correct:false, note:'Diabetes drug — no ABL selectivity' },
+        { name:'Caffeine', label:'D', energy:'-2.8',  eClass:'e-low',  stars:'⭐',        shape:'xanthine',     correct:false, note:'Wrong molecular size and shape' }
+      ],
+      2: [
+        { name:'Imatinib',  label:'A', energy:'-10.1', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated_big', correct:true,  note:'Pioneering BCR-ABL inhibitor — DFG-out binding mode' },
+        { name:'Dasatinib', label:'B', energy:'-8.9',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'twin_flat',     correct:false, note:'2nd-gen kinase inhibitor — DFG-in mode, different geometry' },
+        { name:'Isoniazid', label:'C', energy:'-2.0',  eClass:'e-low',  stars:'⭐',        shape:'simple_py',     correct:false, note:'TB antibiotic — no kinase pocket affinity' },
+        { name:'Sitagliptin',label:'D',energy:'-3.5',  eClass:'e-low',  stars:'⭐⭐',       shape:'triple_big',    correct:false, note:'Gliptin — shaped for DPP-4, not kinase' }
+      ],
+      3: [
+        { name:'Imatinib',  label:'A', energy:'-10.1', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated_big', correct:true,  note:'Gold standard CML drug — methylpiperazine + benzamide' },
+        { name:'Dasatinib', label:'B', energy:'-8.9',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'twin_flat',     correct:false, note:'Different binding mode — DFG-in vs imatinib DFG-out' },
+        { name:'Nilotinib', label:'C', energy:'-9.2',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'rigid_long',    correct:false, note:'2nd-gen — no methylpiperazine, more rigid scaffold' },
+        { name:'Bosutinib', label:'D', energy:'-8.5',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'dual_kin',      correct:false, note:'Dual SRC/ABL inhibitor — different C-lobe contacts' }
+      ],
+      4: [
+        { name:'Imatinib',  label:'A', energy:'-10.1', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'elongated_big', correct:true,  note:'Methylpiperazinyl benzamide — occupies allosteric back pocket' },
+        { name:'Nilotinib', label:'B', energy:'-9.2',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'rigid_long',    correct:false, note:'Trifluoromethyl replaces methylpiperazine — loses back pocket H-bond' },
+        { name:'Ponatinib', label:'C', energy:'-9.5',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'triple_kin',    correct:false, note:'3rd-gen — triflate linker fits T315I but weaker in WT pocket' },
+        { name:'Radotinib', label:'D', energy:'-9.0',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'radio_kin',     correct:false, note:'Imatinib analog — imidazo group introduces steric clash' }
+      ],
+      5: [
+        { name:'Imatinib',    label:'A', energy:'-10.1', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'ima_analog_a', correct:true,  note:'N-methylpiperazine — optimal H-bond with Asp381 in back pocket' },
+        { name:'Imatinib-dm', label:'B', energy:'-9.6',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'ima_analog_b', correct:false, note:'Dimethyl-piperazine — one extra methyl slightly strains the pocket' },
+        { name:'Imatinib-OH', label:'C', energy:'-9.2',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'ima_analog_c', correct:false, note:'Hydroxy-piperazine — extra OH displaces bound water, destabilizing' },
+        { name:'Nor-imatinib',label:'D', energy:'-9.4',  eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'ima_analog_d', correct:false, note:'Des-methyl imatinib — loses van der Waals contact with Val289' }
+      ]
+    }
+  },
+  malaria: {
+    label: 'Malaria', emoji: '🦟', color: '#c084fc',
+    pocket: 'P. falciparum DHFR (PDB: 3QGT)',
+    hint: 'Shallow folate-binding pocket with NADPH groove. Asp54 is key selectivity residue.',
+    correctDrug: 'Pyrimethamine',
+    correctEnergy: '-8.3',
+    dockExplanation: 'Pyrimethamine mimics the pteridine ring of folate. Its two amino groups H-bond with Asp54 and Ile164 in PfDHFR, occupying the folate site 1000× more tightly than in human DHFR.',
+    ligandsByLevel: {
+      1: [
+        { name:'Pyrimethamine', label:'A', energy:'-8.3', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'twin_flat',   correct:true,  note:'Folate mimic — selective for parasite DHFR over human DHFR' },
+        { name:'Aspirin',       label:'B', energy:'+2.0', eClass:'e-bad',  stars:'❌',        shape:'flat_tiny',   correct:false, note:'Wrong enzyme class and too small' },
+        { name:'Metformin',     label:'C', energy:'-1.2', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'No antiparasitic chemistry whatsoever' },
+        { name:'Caffeine',      label:'D', energy:'-2.4', eClass:'e-low',  stars:'⭐',        shape:'xanthine',    correct:false, note:'Purine — partial folate similarity but no selectivity' }
+      ],
+      2: [
+        { name:'Pyrimethamine', label:'A', energy:'-8.3', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'twin_flat',   correct:true,  note:'Diaminopyrimidine — perfect folate pocket geometry' },
+        { name:'Chloroquine',   label:'B', energy:'-5.9', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'chloro_chain',correct:false, note:'Antimalarial but targets heme not DHFR' },
+        { name:'Metformin',     label:'C', energy:'-1.2', eClass:'e-low',  stars:'⭐',        shape:'chain_tiny',  correct:false, note:'Biguanide similarity to pyrimethamine but no DHFR selectivity' },
+        { name:'Isoniazid',     label:'D', energy:'-2.0', eClass:'e-low',  stars:'⭐',        shape:'simple_py',   correct:false, note:'TB antibacterial — no DHFR affinity' }
+      ],
+      3: [
+        { name:'Pyrimethamine',  label:'A', energy:'-8.3', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'twin_flat',   correct:true,  note:'Diaminopyrimidine optimised for PfDHFR selectivity' },
+        { name:'Trimethoprim',   label:'B', energy:'-7.2', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'trimetho',    correct:false, note:'Bacterial DHFR inhibitor — same enzyme family, less PfDHFR selective' },
+        { name:'Cycloguanil',    label:'C', energy:'-7.5', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'cycloguanil', correct:false, note:'Active metabolite of proguanil — related but weaker binding' },
+        { name:'Chloroquine',    label:'D', energy:'-5.9', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'chloro_chain',correct:false, note:'Antimalarial but DHFR-inactive — heme target' }
+      ],
+      4: [
+        { name:'Pyrimethamine', label:'A', energy:'-8.3', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'twin_flat',    correct:true,  note:'Chlorophenyl + diaminopyrimidine — perfect Asp54 contacts' },
+        { name:'Trimethoprim',  label:'B', energy:'-7.2', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'trimetho',     correct:false, note:'Trimethoxybenzyl — same pharmacophore, lacks Cl, reduced PfDHFR potency' },
+        { name:'Cycloguanil',   label:'C', energy:'-7.5', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'cycloguanil',  correct:false, note:'Chlorophenyl guanidine — triazine not pyrimidine, altered H-bond geometry' },
+        { name:'WR99210',       label:'D', energy:'-7.9', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'wr99210',      correct:false, note:'Diaminotriazine — powerful but toxicity issues; different Ile164 contact' }
+      ],
+      5: [
+        { name:'Pyrimethamine', label:'A', energy:'-8.3', eClass:'e-good', stars:'⭐⭐⭐⭐⭐', shape:'pyri_analog_a', correct:true,  note:'4-chlorophenyl + 5-ethyl — exact steric and electronic Asp54/Ile164 fit' },
+        { name:'4-Cl-pyri',     label:'B', energy:'-7.9', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'pyri_analog_b', correct:false, note:'Missing 5-ethyl — reduced hydrophobic contact with Leu46' },
+        { name:'5-Me-pyri',     label:'C', energy:'-7.7', eClass:'e-ok',   stars:'⭐⭐⭐⭐',   shape:'pyri_analog_c', correct:false, note:'Methyl instead of ethyl — slight shortfall in hydrophobic groove fill' },
+        { name:'4-F-pyri',      label:'D', energy:'-7.5', eClass:'e-ok',   stars:'⭐⭐⭐',     shape:'pyri_analog_d', correct:false, note:'Fluoro instead of chloro — weaker van der Waals despite similar size' }
+      ]
+    }
+  }
+};
+
+/* ══════════════════════════════════
+   MOLECULE SVG LIBRARY
+══════════════════════════════════ */
+function getMolSVG(shape, color, size=80) {
+  const c = color || '#00dcff';
+  const f = c + '20';
+  const s = size;
+  const shapes = {
+    // LARGE COMPLEX (multi-ring, like Nirmatrelvir)
+    complex_big: `<polygon points="10,18 22,6 36,10 38,26 26,34 12,28" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="44" cy="12" r="7" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="38" y1="12" x2="44" y2="10" stroke="${c}" stroke-width="1.8"/><line x1="38" y1="26" x2="46" y2="34" stroke="${c}" stroke-width="1.8"/><line x1="46" y1="34" x2="50" y2="26" stroke="${c}" stroke-width="1.5"/><line x1="10" y1="22" x2="4" y2="30" stroke="${c}" stroke-width="1.5"/><polygon points="52,24 60,16 68,22 66,34 56,36" fill="${f}" stroke="${c}" stroke-width="1.5" opacity="0.7"/>`,
+    // TWIN big (like Ritonavir)
+    twin_big: `<polygon points="4,14 16,4 30,10 28,26 16,32 4,24" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="32,8 46,2 58,10 56,26 44,30 32,22" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="28" y1="18" x2="32" y2="18" stroke="${c}" stroke-width="2"/><line x1="16" y1="32" x2="14" y2="44" stroke="${c}" stroke-width="1.5"/><line x1="56" y1="26" x2="62" y2="36" stroke="${c}" stroke-width="1.5"/>`,
+    // TRIPLE big (like Sitagliptin)
+    triple_big: `<polygon points="2,18 14,6 26,12 24,28 12,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="26,10 40,4 52,12 50,28 38,34 26,24" fill="${f}" stroke="${c}" stroke-width="1.8"/><circle cx="18" cy="46" r="8" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="14" y1="34" x2="14" y2="42" stroke="${c}" stroke-width="1.8"/>`,
+    // ELONGATED (like Isoniazid-NAD)
+    elongated: `<rect x="2" y="22" width="58" height="18" rx="6" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="12" cy="31" r="7" fill="${f}" stroke="${c}" stroke-width="1.5"/><polygon points="30,24 46,20 52,31 46,42 30,38 24,31" fill="${f}" stroke="${c}" stroke-width="1.5"/>`,
+    // FLAT TINY (Aspirin)
+    flat_tiny: `<polygon points="18,20 30,10 44,18 44,34 32,42 18,34" fill="${f}" stroke="${c}" stroke-width="1.5"/><line x1="44" y1="26" x2="58" y2="20" stroke="${c}" stroke-width="1.5"/><line x1="58" y1="20" x2="62" y2="28" stroke="${c}" stroke-width="1.5"/>`,
+    // CHAIN TINY (Metformin)
+    chain_tiny: `<line x1="10" y1="32" x2="28" y2="24" stroke="${c}" stroke-width="2"/><line x1="28" y1="24" x2="44" y2="32" stroke="${c}" stroke-width="2"/><line x1="44" y1="32" x2="58" y2="24" stroke="${c}" stroke-width="2"/><line x1="28" y1="24" x2="28" y2="14" stroke="${c}" stroke-width="1.5"/><line x1="44" y1="32" x2="44" y2="44" stroke="${c}" stroke-width="1.5"/>`,
+    // XANTHINE (Caffeine)
+    xanthine: `<polygon points="12,12 26,6 38,14 38,30 26,38 12,30" fill="${f}" stroke="${c}" stroke-width="1.8"/><polygon points="18,16 28,10 36,18 34,28 22,32 14,24" fill="none" stroke="${c}" stroke-width="0.8" stroke-dasharray="3,2"/><line x1="38" y1="22" x2="50" y2="16" stroke="${c}" stroke-width="1.5"/><line x1="50" y1="16" x2="54" y2="24" stroke="${c}" stroke-width="1.5"/>`,
+    // SIMPLE PYRIDINE (Isoniazid alone)
+    simple_py: `<polygon points="18,10 34,6 46,18 42,34 26,38 14,26" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="46" y1="24" x2="60" y2="24" stroke="${c}" stroke-width="1.8"/><line x1="60" y1="24" x2="66" y2="16" stroke="${c}" stroke-width="1.5"/>`,
+    // THIOAMIDE (Ethionamide)
+    thioamide: `<polygon points="16,10 30,4 42,14 40,30 26,36 14,24" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="42" y1="20" x2="56" y2="16" stroke="${c}" stroke-width="1.8"/><line x1="56" y1="16" x2="60" y2="24" stroke="${c}" stroke-width="1.5"/><line x1="56" y1="16" x2="58" y2="8" stroke="${c}" stroke-width="1.5"/>`,
+    // ELONGATED BIG (Imatinib)
+    elongated_big: `<polygon points="2,20 12,8 26,12 28,28 16,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="20" x2="40" y2="20" stroke="${c}" stroke-width="2"/><rect x="40" y="12" width="16" height="16" rx="4" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="56" y1="20" x2="64" y2="20" stroke="${c}" stroke-width="2"/><polygon points="64,14 74,8 80,18 76,30 66,32 60,24" fill="${f}" stroke="${c}" stroke-width="1.5" opacity="0.8"/>`,
+    // TWIN FLAT (Pyrimethamine, Dasatinib)
+    twin_flat: `<polygon points="6,14 20,6 34,14 32,30 18,36 6,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="34,10 48,4 60,14 58,28 44,34 32,24" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    // CHLORO CHAIN (Chloroquine)
+    chloro_chain: `<polygon points="2,20 14,8 26,14 24,30 12,36 2,28" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="26" y1="22" x2="40" y2="16" stroke="${c}" stroke-width="1.8"/><line x1="40" y1="16" x2="54" y2="22" stroke="${c}" stroke-width="1.8"/><line x1="54" y1="22" x2="66" y2="18" stroke="${c}" stroke-width="1.5"/>`,
+    // COMPLEX MID variants
+    complex_mid:  `<polygon points="6,20 18,8 32,12 34,28 22,36 8,28" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="40" cy="14" r="7" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="34" y1="14" x2="40" y2="12" stroke="${c}" stroke-width="1.8"/><line x1="34" y1="28" x2="44" y2="36" stroke="${c}" stroke-width="1.5"/>`,
+    complex_long: `<polygon points="2,20 12,8 26,12 28,28 16,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="36" cy="14" r="6" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="28" y1="14" x2="36" y2="12" stroke="${c}" stroke-width="1.8"/><line x1="28" y1="26" x2="38" y2="36" stroke="${c}" stroke-width="1.5"/><line x1="38" y1="36" x2="50" y2="34" stroke="${c}" stroke-width="1.5"/>`,
+    complex_sq:   `<polygon points="8,18 22,8 36,14 36,30 22,38 8,28" fill="${f}" stroke="${c}" stroke-width="2"/><rect x="38" y="12" width="14" height="14" rx="3" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="52" y1="18" x2="62" y2="14" stroke="${c}" stroke-width="1.5"/>`,
+    // ANALOG variants (Level 5 - very similar)
+    analog_a: `<polygon points="6,18 20,6 34,12 34,28 20,36 6,26" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="40" cy="14" r="6" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="34" y1="14" x2="40" y2="12" stroke="${c}" stroke-width="2"/><polygon points="44,22 54,14 62,22 60,34 50,38 42,30" fill="${f}" stroke="${c}" stroke-width="1.5"/>`,
+    analog_b: `<polygon points="6,18 20,6 34,12 34,28 20,36 6,26" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="40" cy="14" r="6" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="34" y1="14" x2="40" y2="12" stroke="${c}" stroke-width="2"/><polygon points="44,22 54,14 62,22 60,34 50,38 42,30" fill="${f}" stroke="${c}" stroke-width="1.5"/><circle cx="60" cy="24" r="3" fill="${c}" opacity="0.7"/>`,
+    analog_c: `<polygon points="6,18 20,6 34,12 36,28 20,36 6,26" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="42" cy="14" r="6" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="36" y1="14" x2="42" y2="12" stroke="${c}" stroke-width="2"/><polygon points="46,22 56,14 64,24 60,36 50,38 42,30" fill="${f}" stroke="${c}" stroke-width="1.5"/>`,
+    analog_d: `<polygon points="8,18 22,6 36,12 36,28 22,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="42" cy="15" r="5" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="36" y1="15" x2="42" y2="13" stroke="${c}" stroke-width="2"/><polygon points="44,24 54,16 62,24 60,36 48,38 42,30" fill="${f}" stroke="${c}" stroke-width="1.5"/>`,
+    sita_analog_a: `<polygon points="2,18 14,6 28,12 26,28 14,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="28,10 42,4 54,12 52,28 40,34 28,22" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="14" cy="46" r="8" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="14" y1="34" x2="14" y2="42" stroke="${c}" stroke-width="2"/>`,
+    sita_analog_b: `<polygon points="2,18 14,6 28,12 26,28 14,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="28,10 42,4 54,12 52,28 40,34 28,22" fill="${f}" stroke="${c}" stroke-width="1.8"/><circle cx="14" cy="46" r="7" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="14" y1="34" x2="14" y2="42" stroke="${c}" stroke-width="1.8"/>`,
+    sita_analog_c: `<polygon points="2,18 14,6 28,12 26,28 14,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="28,10 42,4 54,12 52,28 40,34 28,22" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="14" cy="46" r="8" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="14" y1="34" x2="14" y2="42" stroke="${c}" stroke-width="2"/><circle cx="56" cy="20" r="3" fill="${c}" opacity="0.8"/>`,
+    sita_analog_d: `<polygon points="2,18 14,6 28,12 26,28 14,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="28,10 42,4 54,12 52,28 40,34 28,22" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="14" cy="44" r="6" fill="${f}" stroke="${c}" stroke-width="1.5"/><line x1="14" y1="34" x2="14" y2="40" stroke="${c}" stroke-width="1.5"/>`,
+    inh_analog_a: `<polygon points="16,8 30,2 44,12 40,30 24,36 12,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="44" y1="18" x2="58" y2="14" stroke="${c}" stroke-width="2"/><line x1="58" y1="14" x2="64" y2="22" stroke="${c}" stroke-width="2"/>`,
+    inh_analog_b: `<polygon points="16,8 30,2 44,12 40,30 24,36 12,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="44" y1="18" x2="58" y2="14" stroke="${c}" stroke-width="2"/><line x1="58" y1="14" x2="64" y2="22" stroke="${c}" stroke-width="2"/><circle cx="32" cy="4" r="3" fill="${c}" opacity="0.7"/>`,
+    inh_analog_c: `<polygon points="18,8 32,2 46,12 42,30 26,36 14,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="46" y1="18" x2="60" y2="14" stroke="${c}" stroke-width="2"/><line x1="60" y1="14" x2="66" y2="22" stroke="${c}" stroke-width="2"/>`,
+    inh_analog_d: `<polygon points="16,8 30,2 44,12 40,30 24,36 12,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="44" y1="18" x2="60" y2="14" stroke="${c}" stroke-width="2"/><line x1="60" y1="14" x2="66" y2="22" stroke="${c}" stroke-width="2"/><rect x="28" y="0" width="8" height="4" rx="1" fill="${c}" opacity="0.6"/>`,
+    ima_analog_a: `<polygon points="2,20 12,8 26,12 28,28 16,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="20" x2="40" y2="20" stroke="${c}" stroke-width="2"/><rect x="40" y="12" width="16" height="16" rx="4" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="56" y1="20" x2="64" y2="20" stroke="${c}" stroke-width="2"/><circle cx="68" cy="20" r="6" fill="${f}" stroke="${c}" stroke-width="2"/>`,
+    ima_analog_b: `<polygon points="2,20 12,8 26,12 28,28 16,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="20" x2="40" y2="20" stroke="${c}" stroke-width="2"/><rect x="40" y="12" width="16" height="16" rx="4" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="56" y1="20" x2="64" y2="20" stroke="${c}" stroke-width="2"/><polygon points="62,14 72,8 78,20 72,32 62,28 58,20" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    ima_analog_c: `<polygon points="2,20 12,8 26,12 28,28 16,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="20" x2="40" y2="20" stroke="${c}" stroke-width="2"/><rect x="40" y="12" width="16" height="16" rx="4" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="56" y1="20" x2="64" y2="20" stroke="${c}" stroke-width="2"/><circle cx="68" cy="20" r="6" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="68" cy="14" r="2" fill="${c}" opacity="0.7"/>`,
+    ima_analog_d: `<polygon points="2,20 12,8 26,12 28,28 16,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="20" x2="40" y2="20" stroke="${c}" stroke-width="2"/><rect x="40" y="12" width="14" height="16" rx="4" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="54" y1="20" x2="62" y2="20" stroke="${c}" stroke-width="2"/><circle cx="66" cy="20" r="5" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    pyri_analog_a: `<polygon points="8,14 22,6 36,14 34,30 20,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="36,10 50,4 62,14 60,28 46,34 34,22" fill="${f}" stroke="${c}" stroke-width="2"/>`,
+    pyri_analog_b: `<polygon points="8,14 22,6 36,14 34,30 20,36 8,26" fill="${f}" stroke="${c}" stroke-width="1.8"/><polygon points="36,10 50,4 62,14 60,28 46,34 34,22" fill="${f}" stroke="${c}" stroke-width="2"/>`,
+    pyri_analog_c: `<polygon points="8,14 22,6 36,14 34,30 20,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="36,10 50,4 62,14 60,28 46,34 34,22" fill="${f}" stroke="${c}" stroke-width="1.8"/><circle cx="24" cy="36" r="2.5" fill="${c}" opacity="0.6"/>`,
+    pyri_analog_d: `<polygon points="8,14 22,6 36,14 34,30 20,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="36,10 50,4 62,14 60,28 46,34 34,22" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="10" cy="20" r="2" fill="${c}" opacity="0.7"/>`,
+    // Extra shapes
+    cyclo_mid:   `<circle cx="24" cy="22" r="16" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="38,10 52,4 62,14 58,28 44,32 34,22" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="38" y1="18" x2="40" y2="18" stroke="${c}" stroke-width="2"/>`,
+    uracil_mid:  `<polygon points="4,14 18,4 32,12 32,28 18,36 4,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="22,16 32,8 42,14 42,26 32,32 22,24" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="3,2"/><polygon points="34,8 50,2 62,12 58,28 44,32 32,24" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    triple_long: `<polygon points="2,18 14,6 26,12 24,28 12,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="26,10 40,4 52,12 50,28 38,34 26,24" fill="${f}" stroke="${c}" stroke-width="1.8"/><circle cx="16" cy="46" r="7" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="14" y1="34" x2="14" y2="42" stroke="${c}" stroke-width="1.8"/><line x1="52" y1="20" x2="62" y2="20" stroke="${c}" stroke-width="1.5"/>`,
+    triple_sq:   `<polygon points="2,18 14,6 26,12 24,28 12,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="26,10 40,4 52,12 50,28 38,34 26,24" fill="${f}" stroke="${c}" stroke-width="2"/><rect x="6" y="38" width="14" height="14" rx="3" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    triple_mid:  `<polygon points="2,18 14,6 26,12 24,28 12,34 2,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="26,10 40,4 52,12 50,28 38,34 26,24" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="14" cy="44" r="6" fill="${f}" stroke="${c}" stroke-width="1.5"/><line x1="12" y1="34" x2="12" y2="40" stroke="${c}" stroke-width="1.5"/>`,
+    rigid_long:  `<polygon points="4,18 16,6 30,12 30,28 18,36 4,28" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="30" y1="20" x2="46" y2="20" stroke="${c}" stroke-width="2.5"/><polygon points="46,12 60,6 70,18 66,32 54,36 44,26" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    dual_kin:    `<polygon points="2,16 14,4 28,10 28,26 16,34 2,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="18" x2="38" y2="12" stroke="${c}" stroke-width="2"/><polygon points="38,6 52,2 62,12 58,28 44,30 36,20" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    triple_kin:  `<polygon points="4,18 16,6 30,12 28,28 16,34 4,26" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="28" y1="22" x2="40" y2="16" stroke="${c}" stroke-width="2"/><polygon points="40,10 54,4 64,14 60,30 48,34 38,24" fill="${f}" stroke="${c}" stroke-width="1.8"/><circle cx="16" cy="46" r="6" fill="${f}" stroke="${c}" stroke-width="1.5"/>`,
+    radio_kin:   `<polygon points="4,18 16,6 30,12 28,28 16,34 4,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="30,10 44,4 56,12 54,28 42,34 30,22" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="44" y1="34" x2="44" y2="46" stroke="${c}" stroke-width="1.8"/>`,
+    twin_mid:    `<polygon points="6,14 20,6 32,14 30,30 18,36 6,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="32,10 44,4 56,14 54,28 42,34 30,22" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    trimetho:    `<polygon points="8,14 22,6 34,14 32,30 20,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="8" y1="20" x2="0" y2="14" stroke="${c}" stroke-width="1.5"/><line x1="8" y1="20" x2="0" y2="26" stroke="${c}" stroke-width="1.5"/><polygon points="34,10 48,4 58,14 56,28 44,34 32,22" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    cycloguanil: `<polygon points="10,14 24,6 36,16 32,32 18,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="10" y1="20" x2="0" y2="20" stroke="${c}" stroke-width="1.5"/><polygon points="36,12 50,6 60,18 56,32 42,36 34,24" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    triclosan:   `<polygon points="8,14 22,6 34,14 32,30 20,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="34" y1="22" x2="46" y2="16" stroke="${c}" stroke-width="2"/><polygon points="46,10 58,4 68,14 66,28 54,32 44,22" fill="${f}" stroke="${c}" stroke-width="1.8"/>`,
+    boronate:    `<polygon points="10,14 24,6 36,16 32,32 18,36 8,26" fill="${f}" stroke="${c}" stroke-width="2"/><circle cx="42" cy="18" r="8" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="36" y1="20" x2="42" y2="18" stroke="${c}" stroke-width="2"/>`,
+    pro_thio:    `<polygon points="16,8 30,2 44,12 40,30 24,36 12,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="44" y1="18" x2="58" y2="14" stroke="${c}" stroke-width="2"/><line x1="58" y1="14" x2="68" y2="22" stroke="${c}" stroke-width="2"/><line x1="68" y1="22" x2="74" y2="16" stroke="${c}" stroke-width="1.5"/>`,
+    methyl_inh:  `<polygon points="16,8 30,2 44,12 40,30 24,36 12,24" fill="${f}" stroke="${c}" stroke-width="2"/><line x1="44" y1="18" x2="58" y2="14" stroke="${c}" stroke-width="2"/><line x1="58" y1="14" x2="62" y2="22" stroke="${c}" stroke-width="2"/><circle cx="30" cy="0" r="3" fill="${c}" opacity="0.7"/>`,
+    wr99210:     `<polygon points="6,14 20,6 32,14 30,30 18,36 6,26" fill="${f}" stroke="${c}" stroke-width="2"/><polygon points="32,10 46,4 58,14 56,28 44,34 30,22" fill="${f}" stroke="${c}" stroke-width="1.8"/><line x1="18" y1="36" x2="14" y2="48" stroke="${c}" stroke-width="1.5"/>`,
+  };
+  return shapes[shape] || shapes['flat_tiny'];
+}
+
+/* ══════════════════════════════════
+   POCKET SVG GENERATOR
+══════════════════════════════════ */
+function getPocketSVG(disease) {
+  const pockets = {
+    covid: `
+      <ellipse cx="100" cy="95" rx="90" ry="85" fill="#060d1f" stroke="#1a3055" stroke-width="1.5"/>
+      <path d="M60,38 C50,44 44,56 42,72 C40,88 42,104 50,116 C58,128 68,134 82,136 C96,138 110,132 120,122 C130,112 135,98 133,83 C131,68 122,54 112,46 C102,38 72,34 60,38Z" fill="#1a2d50" stroke="#2563eb" stroke-width="2.5"/>
+      <ellipse cx="70" cy="64" rx="13" ry="9" fill="#1e3a6e" stroke="#3b82f6" stroke-width="1.5" opacity="0.9"/>
+      <ellipse cx="114" cy="74" rx="11" ry="16" fill="#1e3a6e" stroke="#3b82f6" stroke-width="1.5" opacity="0.9"/>
+      <ellipse cx="85" cy="116" rx="15" ry="9" fill="#1e3a6e" stroke="#3b82f6" stroke-width="1" opacity="0.7"/>
+      <circle cx="88" cy="93" r="5" fill="#00dcff" opacity="0.5"/>
+      <text x="68" y="61" font-family="'DM Mono'" font-size="8" fill="#60a5fa">S1</text>
+      <text x="110" y="71" font-family="'DM Mono'" font-size="8" fill="#60a5fa">S2</text>
+      <text x="82" y="120" font-family="'DM Mono'" font-size="8" fill="#60a5fa">S4</text>
+      <text x="84" y="93" font-family="'DM Mono'" font-size="7" fill="#00dcff">Cys145</text>`,
+    diabetes: `
+      <ellipse cx="100" cy="95" rx="90" ry="85" fill="#060d1f" stroke="#1a3055" stroke-width="1.5"/>
+      <path d="M38,54 C36,64 34,80 38,96 C42,112 54,128 72,136 C90,144 112,142 130,134 C148,126 158,110 160,94 C162,78 156,62 144,52 C132,42 116,36 98,36 C80,36 62,40 52,48 C45,52 40,52 38,54Z" fill="#2d1a05" stroke="#d97706" stroke-width="2.5"/>
+      <ellipse cx="78" cy="73" rx="17" ry="13" fill="#3d2508" stroke="#f59e0b" stroke-width="1.5" opacity="0.9"/>
+      <ellipse cx="128" cy="87" rx="13" ry="20" fill="#3d2508" stroke="#f59e0b" stroke-width="1.5" opacity="0.9"/>
+      <circle cx="95" cy="96" r="5" fill="#ffc107" opacity="0.5"/>
+      <text x="70" y="70" font-family="'DM Mono'" font-size="8" fill="#f59e0b">S1</text>
+      <text x="120" y="83" font-family="'DM Mono'" font-size="8" fill="#f59e0b">S2'</text>
+      <text x="91" y="96" font-family="'DM Mono'" font-size="7" fill="#ffc107">Ser630</text>`,
+    tb: `
+      <ellipse cx="100" cy="95" rx="90" ry="85" fill="#060d1f" stroke="#1a3055" stroke-width="1.5"/>
+      <path d="M48,44 C43,50 40,66 41,86 C42,106 50,124 64,134 C78,144 98,146 118,140 C138,134 152,118 156,100 C160,82 154,62 142,50 C130,38 112,32 94,33 C76,34 56,38 48,44Z" fill="#0a2015" stroke="#059669" stroke-width="2.5"/>
+      <rect x="56" y="60" width="86" height="26" rx="8" fill="#102a1a" stroke="#10b981" stroke-width="1.5" opacity="0.9"/>
+      <ellipse cx="100" cy="110" rx="22" ry="14" fill="#102a1a" stroke="#10b981" stroke-width="1.5" opacity="0.8"/>
+      <circle cx="98" cy="107" r="5" fill="#00ff9d" opacity="0.5"/>
+      <text x="88" y="75" font-family="'DM Mono'" font-size="8" fill="#10b981">NAD+ groove</text>
+      <text x="94" y="107" font-family="'DM Mono'" font-size="7" fill="#00ff9d">Tyr158</text>`,
+    cancer: `
+      <ellipse cx="100" cy="95" rx="90" ry="85" fill="#060d1f" stroke="#1a3055" stroke-width="1.5"/>
+      <path d="M44,40 C36,52 33,70 36,90 C39,110 50,128 66,138 C82,148 104,148 122,140 C140,132 152,116 156,96 C160,76 154,56 140,44 C126,32 106,28 88,29 C70,30 54,32 44,40Z" fill="#1f0a0a" stroke="#dc2626" stroke-width="2.5"/>
+      <path d="M62,55 C58,62 56,75 60,87 C64,99 74,108 88,110 C102,112 116,106 122,94 C128,82 126,68 118,58 C110,48 96,44 82,45 C68,46 68,48 62,55Z" fill="#2d0f0f" stroke="#ef4444" stroke-width="1.5" opacity="0.9"/>
+      <line x1="89" y1="44" x2="89" y2="113" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+      <circle cx="86" cy="82" r="5" fill="#ff4560" opacity="0.5"/>
+      <text x="92" y="60" font-family="'DM Mono'" font-size="8" fill="#ef4444">Hinge</text>
+      <text x="82" y="82" font-family="'DM Mono'" font-size="7" fill="#ff4560">Thr315</text>`,
+    malaria: `
+      <ellipse cx="100" cy="95" rx="90" ry="85" fill="#060d1f" stroke="#1a3055" stroke-width="1.5"/>
+      <path d="M50,50 C42,60 38,78 40,97 C42,116 54,132 72,140 C90,148 112,146 128,136 C144,126 153,108 153,90 C153,72 144,54 130,46 C116,38 98,34 82,37 C66,40 60,40 50,50Z" fill="#150a2d" stroke="#9333ea" stroke-width="2.5"/>
+      <rect x="53" y="66" width="92" height="20" rx="6" fill="#200f3d" stroke="#a855f7" stroke-width="1.5" opacity="0.9"/>
+      <ellipse cx="96" cy="105" rx="24" ry="16" fill="#200f3d" stroke="#a855f7" stroke-width="1.5" opacity="0.8"/>
+      <circle cx="95" cy="104" r="5" fill="#c084fc" opacity="0.5"/>
+      <text x="86" y="79" font-family="'DM Mono'" font-size="8" fill="#a855f7">NADPH</text>
+      <text x="90" y="104" font-family="'DM Mono'" font-size="7" fill="#c084fc">Asp54</text>`
+  };
+  return pockets[disease] || pockets.covid;
+}
+
+/* ══════════════════════════════════
+   SCREEN NAVIGATION
+══════════════════════════════════ */
+function goTo(targetId) {
+  const current = document.getElementById(currentScreen);
+  const target  = document.getElementById(targetId);
+  current.classList.add('exit-left');
+  target.classList.remove('exit-left');
+  target.classList.add('active');
+  current.classList.remove('active');
+  setTimeout(() => {
+    current.classList.remove('exit-left');
+    current.classList.add('enter-right');
+    setTimeout(() => current.classList.remove('enter-right'), 50);
+  }, 500);
+  currentScreen = targetId;
+  // Scroll to top of new screen
+  target.scrollTop = 0;
+}
+
+/* ══════════════════════════════════
+   LEVEL SELECT
+══════════════════════════════════ */
+function selectLevel(lvl, el) {
+  selectedLevel = lvl;
+  document.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const btn = document.getElementById('btn-level-next');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+  document.getElementById('level-info-box').innerHTML = LEVEL_DESCS[lvl];
+}
+
+/* ══════════════════════════════════
+   DISEASE SELECT
+══════════════════════════════════ */
+function selectDisease(d, el) {
+  selectedDisease = d;
+  document.querySelectorAll('.disease-card').forEach(c => {
+    c.classList.remove('selected');
+    c.style.borderColor = '';
+    c.style.boxShadow = '';
+  });
+  el.classList.add('selected');
+  const dc = DISEASES[d];
+  el.style.borderColor = dc.color;
+  el.style.boxShadow = `0 0 30px ${dc.color}40`;
+  const btn = document.getElementById('btn-start-game');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+}
+
+/* ══════════════════════════════════
+   START GAME
+══════════════════════════════════ */
+function startGame() {
+  if (!selectedLevel || !selectedDisease) return;
+  selectedLigand = null;
+  answerSubmitted = false;
+  const dis = DISEASES[selectedDisease];
+  const ligands = dis.ligandsByLevel[selectedLevel];
+
+  // HUD
+  document.getElementById('hud-player').textContent = `P${playerCount + 1}`;
+  document.getElementById('hud-disease').textContent = dis.emoji + ' ' + dis.label;
+  document.getElementById('hud-level').textContent = `Lv.${selectedLevel}`;
+  document.getElementById('hud-target').textContent = dis.correctDrug;
+
+  // Pocket
+  document.getElementById('game-pocket-title').textContent = dis.pocket;
+  document.getElementById('game-pocket-svg').innerHTML = getPocketSVG(selectedDisease);
+  document.getElementById('game-pocket-hint').textContent = dis.hint;
+
+  // Ligands
+  const grid = document.getElementById('ligand-grid');
+  grid.innerHTML = '';
+  ligands.forEach((lig, i) => {
+    const card = document.createElement('div');
+    card.className = 'ligand-card-game';
+    card.id = `ligcard-${i}`;
+    card.onclick = () => chooseLigand(i);
+    card.innerHTML = `
+      <div class="lig-letter">${lig.label}</div>
+      <div class="lig-reveal-badge" id="lig-badge-${i}"></div>
+      <svg class="mol-svg" viewBox="0 0 72 54">${getMolSVG(lig.shape, dis.color)}</svg>
+      <div class="lig-name">${lig.name}</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Submit btn
+  const sbtn = document.getElementById('submit-btn');
+  sbtn.disabled = true;
+  sbtn.style.opacity = '0.4';
+  sbtn.style.cursor = 'not-allowed';
+  document.getElementById('selection-msg').textContent = 'Click a molecule to select it';
+
+  goTo('screen-game');
+}
+
+/* ══════════════════════════════════
+   CHOOSE LIGAND
+══════════════════════════════════ */
+function chooseLigand(i) {
+  if (answerSubmitted) return;
+  selectedLigand = i;
+  document.querySelectorAll('.ligand-card-game').forEach((c, idx) => {
+    c.classList.toggle('chosen', idx === i);
+  });
+  const sbtn = document.getElementById('submit-btn');
+  sbtn.disabled = false;
+  sbtn.style.opacity = '1';
+  sbtn.style.cursor = 'pointer';
+  const dis = DISEASES[selectedDisease];
+  const lig = dis.ligandsByLevel[selectedLevel][i];
+  document.getElementById('selection-msg').textContent = `Selected: ${lig.label} — ${lig.name}`;
+}
+
+/* ══════════════════════════════════
+   SUBMIT ANSWER
+══════════════════════════════════ */
+function submitAnswer() {
+  if (selectedLigand === null || answerSubmitted) return;
+  answerSubmitted = true;
+
+  const dis = DISEASES[selectedDisease];
+  const ligands = dis.ligandsByLevel[selectedLevel];
+  const correct = ligands.findIndex(l => l.correct);
+  const won = selectedLigand === correct;
+
+  // Reveal cards
+  ligands.forEach((lig, i) => {
+    const card = document.getElementById(`ligcard-${i}`);
+    const badge = document.getElementById(`lig-badge-${i}`);
+    card.classList.add('locked');
+    card.classList.remove('chosen');
+    if (i === correct) {
+      card.classList.add('correct-reveal');
+      badge.textContent = '✅';
+    } else if (i === selectedLigand && !won) {
+      card.classList.add('chosen-wrong-reveal');
+      badge.textContent = '❌';
+    } else {
+      card.classList.add('wrong-reveal');
+    }
+  });
+
+  // Stars calculation based on energy and whether correct
+  let starsCount = 0;
+  if (won) {
+    starsCount = 5;
+  } else {
+    const chosenEnergy = parseFloat(ligands[selectedLigand].energy);
+    if (chosenEnergy < -8) starsCount = 4;
+    else if (chosenEnergy < -6) starsCount = 3;
+    else if (chosenEnergy < -4) starsCount = 2;
+    else if (chosenEnergy < -1) starsCount = 1;
+    else starsCount = 0;
+  }
+
+  // Score for leaderboard
+  const score = starsCount * 20; // 100 max
+
+  // Record player
+  playerCount++;
+  leaderboard.push({
+    playerNum: playerCount,
+    name: `Player ${playerCount}`,
+    disease: dis.emoji + ' ' + dis.label,
+    level: selectedLevel,
+    stars: starsCount,
+    score: score,
+    correct: won
+  });
+  // Sort leaderboard
+  leaderboard.sort((a,b) => b.score - a.score || b.level - a.level);
+
+  // Build result screen
+  buildResultScreen(won, starsCount, score);
+
+  setTimeout(() => goTo('screen-result'), 600);
+}
+
+/* ══════════════════════════════════
+   BUILD RESULT SCREEN
+══════════════════════════════════ */
+function buildResultScreen(won, starsCount, score) {
+  const dis = DISEASES[selectedDisease];
+  const ligands = dis.ligandsByLevel[selectedLevel];
+  const correct = ligands.findIndex(l => l.correct);
+
+  // Hero
+  document.getElementById('result-icon').textContent = won ? '🎯' : '🔬';
+  const titleEl = document.getElementById('result-title');
+  titleEl.textContent = won ? 'Correct! Excellent Docking!' : `Not quite — ${dis.correctDrug} was the best fit`;
+  titleEl.style.color = won ? 'var(--green)' : 'var(--amber)';
+  document.getElementById('result-subtitle').textContent = won
+    ? `You matched the computer's top-scoring molecule! Level ${selectedLevel} cleared.`
+    : `Your molecule scored ${ligands[selectedLigand].energy} kcal/mol. The best: ${dis.correctEnergy} kcal/mol.`;
+
+  // Stars
+  const starsRow = document.getElementById('stars-row');
+  starsRow.innerHTML = '';
+  for (let i = 0; i < 5; i++) {
+    const star = document.createElement('div');
+    star.className = 'star-item';
+    star.style.animationDelay = `${0.1 + i*0.1}s`;
+    star.textContent = i < starsCount ? '⭐' : '☆';
+    if (i >= starsCount) star.style.opacity = '0.3';
+    starsRow.appendChild(star);
+  }
+
+  // Docking animation
+  buildDockingAnimation();
+
+  // Score table
+  const tbody = document.getElementById('score-mini-tbody');
+  tbody.innerHTML = '';
+  ligands.forEach((lig, i) => {
+    const tr = document.createElement('tr');
+    if (i === correct) tr.className = 'best-row';
+    tr.innerHTML = `
+      <td style="font-weight:700;color:${i===correct?'var(--green)':i===selectedLigand&&i!==correct?'var(--amber)':'var(--muted)'}">${lig.label}${i===correct?' ✓':''}</td>
+      <td class="${lig.eClass}">${lig.energy}</td>
+      <td class="e-stars">${lig.stars}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Binding note
+  document.getElementById('binding-note').innerHTML =
+    `<strong style="color:var(--cyan)">💡 </strong>${dis.dockExplanation}`;
+  document.getElementById('dock-explanation').textContent =
+    `${dis.correctDrug} → ${dis.pocket}. Binding energy: ${dis.correctEnergy} kcal/mol`;
+}
+
+/* ══════════════════════════════════
+   DOCKING ANIMATION SVG
+══════════════════════════════════ */
+function buildDockingAnimation() {
+  const dis = DISEASES[selectedDisease];
+  const c = dis.color;
+  const pocketMini = {
+    covid:    `<ellipse cx="80" cy="80" rx="70" ry="66" fill="#0a1628" stroke="#2563eb" stroke-width="1.5"/><path d="M48,38 C42,46 38,58 40,72 C42,86 50,96 62,102 C74,108 88,108 98,100 C108,92 114,80 112,66 C110,52 102,42 90,38 C78,34 56,32 48,38Z" fill="#1a2d50" stroke="#3b82f6" stroke-width="2"/>`,
+    diabetes: `<ellipse cx="80" cy="80" rx="70" ry="66" fill="#0a1628" stroke="#d97706" stroke-width="1.5"/><path d="M30,50 C28,62 26,76 30,90 C34,104 46,116 60,120 C74,124 92,120 104,110 C116,100 122,86 120,72 C118,58 108,48 94,44 C80,40 62,42 50,48 C40,52 32,48 30,50Z" fill="#2d1a05" stroke="#f59e0b" stroke-width="2"/>`,
+    tb:       `<ellipse cx="80" cy="80" rx="70" ry="66" fill="#0a1628" stroke="#059669" stroke-width="1.5"/><rect x="28" y="52" width="88" height="28" rx="10" fill="#0a2015" stroke="#10b981" stroke-width="2"/>`,
+    cancer:   `<ellipse cx="80" cy="80" rx="70" ry="66" fill="#0a1628" stroke="#dc2626" stroke-width="1.5"/><path d="M34,44 C28,54 26,70 28,86 C30,102 40,116 54,122 C68,128 86,128 100,120 C114,112 122,98 122,82 C122,66 114,52 100,44 C86,36 72,34 58,38 C44,42 40,36 34,44Z" fill="#1f0a0a" stroke="#ef4444" stroke-width="2"/>`,
+    malaria:  `<ellipse cx="80" cy="80" rx="70" ry="66" fill="#0a1628" stroke="#9333ea" stroke-width="1.5"/><path d="M36,50 C30,60 28,76 30,92 C32,108 44,120 60,126 C76,132 96,130 110,120 C124,110 130,94 128,78 C126,62 116,50 100,46 C84,42 68,42 56,48 C46,52 40,44 36,50Z" fill="#150a2d" stroke="#a855f7" stroke-width="2"/>`
+  };
+  const ligands = DISEASES[selectedDisease].ligandsByLevel[selectedLevel];
+  const correct = ligands.findIndex(l => l.correct);
+  const molShape = getMolSVG(ligands[correct].shape, c);
+  const svg = document.getElementById('dock-anim-svg');
+  svg.innerHTML = `
+    <g transform="scale(0.72) translate(0,10)">${pocketMini[selectedDisease]}</g>
+    <g class="dock-molecule" transform="translate(55,42)">${molShape}</g>
+    <circle class="energy-pulse" cx="140" cy="80" r="4" fill="${c}"/>
+    <circle class="energy-pulse" cx="140" cy="80" r="4" fill="${c}" style="animation-delay:0.5s"/>
+  `;
+}
+
+/* ══════════════════════════════════
+   LEADERBOARD
+══════════════════════════════════ */
+function goToLeaderboard() {
+  buildLeaderboard();
+  goTo('screen-leaderboard');
+}
+
+function buildLeaderboard() {
+  const currentPlayer = leaderboard.find(p => p.playerNum === playerCount);
+  const currentRank = leaderboard.indexOf(currentPlayer) + 1;
+
+  document.getElementById('lb-current-banner').innerHTML =
+    `${currentPlayer.name} · ${currentPlayer.disease} · Level ${currentPlayer.level} · ${'⭐'.repeat(currentPlayer.stars)||'—'} · Rank #${currentRank}`;
+
+  document.getElementById('total-players-count').textContent = playerCount;
+
+  const tbody = document.getElementById('lb-tbody');
+  tbody.innerHTML = '';
+  leaderboard.forEach((p, idx) => {
+    const rank = idx + 1;
+    const isMe = p.playerNum === playerCount;
+    const tr = document.createElement('tr');
+    if (isMe) tr.className = 'lb-me';
+    const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+    tr.innerHTML = `
+      <td class="lb-rank ${rankClass}">${medal||rank}</td>
+      <td>
+        <div class="lb-name">${p.name}${isMe?' 👈':''}</div>
+        <div class="lb-disease">Lv.${p.level} · ${p.correct?'Correct':'Near miss'}</div>
+      </td>
+      <td class="lb-disease" style="color:var(--muted)">${p.disease}</td>
+      <td class="lb-stars-cell">${'⭐'.repeat(p.stars)||'—'}</td>
+      <td class="lb-score-cell">${p.score}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Confetti if perfect score
+  if (currentPlayer.stars === 5) launchConfetti();
+}
+
+/* ══════════════════════════════════
+   NEXT PLAYER
+══════════════════════════════════ */
+function nextPlayer() {
+  selectedLevel  = null;
+  selectedDisease = null;
+  selectedLigand  = null;
+  answerSubmitted = false;
+  document.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.disease-card').forEach(c => {
+    c.classList.remove('selected');
+    c.style.borderColor = '';
+    c.style.boxShadow = '';
+  });
+  const lbtn = document.getElementById('btn-level-next');
+  lbtn.disabled = true; lbtn.style.opacity = '0.4'; lbtn.style.cursor = 'not-allowed';
+  const sbtn = document.getElementById('btn-start-game');
+  sbtn.disabled = true; sbtn.style.opacity = '0.4'; sbtn.style.cursor = 'not-allowed';
+  document.getElementById('level-info-box').textContent = 'Select a level to see what to expect →';
+  goTo('screen-level');
+}
+
+/* ══════════════════════════════════
+   CONFETTI
+══════════════════════════════════ */
+function launchConfetti() {
+  const colors = ['#00dcff','#00ff9d','#ffc107','#ff4560','#c084fc'];
+  for (let i = 0; i < 60; i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'confetti-piece';
+      el.style.cssText = `
+        left:${Math.random()*100}%;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        width:${Math.random()*10+5}px;
+        height:${Math.random()*10+6}px;
+        border-radius:${Math.random()>0.5?'50%':'2px'};
+        animation-duration:${Math.random()*2+2}s;
+        animation-delay:${Math.random()*0.5}s;
+        transform:rotate(${Math.random()*360}deg);
+      `;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }, i * 30);
+  }
+}
+
+/* ══════════════════════════════════
+   FLOATING BACKGROUND MOLECULES
+══════════════════════════════════ */
+(function spawnFloatingMols() {
+  const bg = document.getElementById('bg-layer');
+  const shapes = ['⬡','⬢','○','△','⬟'];
+  for (let i = 0; i < 12; i++) {
+    const d = document.createElement('div');
+    d.className = 'float-mol';
+    d.textContent = shapes[Math.floor(Math.random()*shapes.length)];
+    d.style.cssText = `
+      left:${Math.random()*100}%;
+      font-size:${Math.random()*18+8}px;
+      color:rgba(0,220,255,0.15);
+      animation-duration:${Math.random()*25+20}s;
+      animation-delay:${Math.random()*20}s;
+    `;
+    bg.appendChild(d);
+  }
+})();
+</script>
+</body>
+</html>
